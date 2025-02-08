@@ -44,7 +44,7 @@ def create(movie: schemas.MovieBase, db: Session = Depends(get_db)):
     db.refresh(new_movie)
     return f"This {new_movie.title} has been saved successfully"
 
-@app.get("/movies/", response_model=list[schemas.MovieBase])
+@app.get("/movies/", response_model=list[schemas.Movie])
 def read(db: Session = Depends(get_db)):
     movies = db.query(models.Movie).all()
     return movies
@@ -56,9 +56,9 @@ def get_movie(movie_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Movie not found")
     return movie
 
-@app.put("/movies/{movie_id}", status_code=status.HTTP_202_ACCEPTED)
-def update_movie(movie_id: int, movie: dict, db: Session = Depends(get_db)):
-    db_movie = db.query(models.Movie).filter(models.Movie.id == movie_id).first()
+@app.put("/movies", status_code=status.HTTP_202_ACCEPTED)
+def update_movie(id: int, movie: dict, db: Session = Depends(get_db)):
+    db_movie = db.query(models.Movie).filter(models.Movie.id == id).first()
     if db_movie is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Movie not found")
     if "poster_url" in movie:
@@ -75,9 +75,9 @@ def update_movie(movie_id: int, movie: dict, db: Session = Depends(get_db)):
     db.refresh(db_movie)
     return db_movie
 
-@app.delete("/movies/{movie_id}", status_code=status.HTTP_202_ACCEPTED)
-def deletemovie(movie_id: int, db: Session = Depends(get_db)):
-    db_movie = db.query(models.Movie).filter(models.Movie.id == movie_id).first()
+@app.delete("/movies", status_code=status.HTTP_202_ACCEPTED)
+def deletemovie(id: int, db: Session = Depends(get_db)):
+    db_movie = db.query(models.Movie).filter(models.Movie.id == id).first()
     if db_movie is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Movie not found")
     db.delete(db_movie)
