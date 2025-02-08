@@ -31,6 +31,7 @@ export const getMovieById = async (movieId) => {
 export const createMovie = async (movieData) => {
   try {
     const response = await axios.post(`${BASE_URL}/create`, movieData);
+    console.log("Created movie:", response.data);
     return response.data;
   } catch (error) {
     console.error("Error creating movie:", error);
@@ -41,7 +42,8 @@ export const createMovie = async (movieData) => {
 // Update an existing movie
 export const updateMovie = async (movieId, movieData) => {
   try {
-    const response = await axios.put(`${BASE_URL}/${movieId}`, movieData);
+    const response = await axios.put(`${BASE_URL}?id=${movieId}`, movieData);
+    console.log("Updated movie:", response.data);
     return response.data;
   } catch (error) {
     console.error(`Error updating movie ${movieId}:`, error);
@@ -50,200 +52,188 @@ export const updateMovie = async (movieId, movieData) => {
 };
 
 // Delete a movie
-export const deleteMovie = async (movieId) => {
-  try {
-    const response = await axios.delete(`${BASE_URL}/${movieId}`);
-    return response.data;
-  } catch (error) {
-    console.error(`Error deleting movie ${movieId}:`, error);
-    throw error;
-  }
-};
+export const deleteMovie = async (id) => {
+    console.log("Deleting movie with ID:", id); // Debugging line
+    if (!id) {
+      console.error("Error: movie_id is undefined");
+      return;
+    }
+  
+    try {
+      const response = await axios.delete(`${BASE_URL}?id=${id}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Error deleting movie ${id}:`, error);
+      throw error;
+    }
+  };
+  
+
 ```
 ### `Movielist.js`
 
 ```js
 import React, { useEffect, useState } from "react";
-import {
-  getMovies,
-  getMovieById,
-  createMovie,
-  updateMovie,
-  deleteMovie,
-} from "../api/axiosMoviesApi";
+import { getMovies, createMovie, deleteMovie, updateMovie } from "../api/axiosMoviesApi"; // Import API functions
 
 const MoviesList = () => {
   const [movies, setMovies] = useState([]);
-  const [newMovie, setNewMovie] = useState({
+  const [loading, setLoading] = useState(true);
+  const [editingMovieId, setEditingMovieId] = useState(null); // Track editing mode
+  const [movieForm, setMovieForm] = useState({
     title: "",
     director: "",
     release_year: "",
-    poster_url: "",
     price: "",
+    poster_url: "",
   });
-  const [editingMovieId, setEditingMovieId] = useState(null);
-  const [editingMovieData, setEditingMovieData] = useState(null);
 
+  // Fetch all movies on component mount
   useEffect(() => {
+    const fetchMovies = async () => {
+      try {
+        const data = await getMovies();
+        setMovies(data);
+      } catch (error) {
+        console.error("Error fetching movies:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
     fetchMovies();
   }, []);
 
-  const fetchMovies = async () => {
-    try {
-      const data = await getMovies();
-      setMovies(data);
-    } catch (error) {
-      console.error("Error fetching movies:", error);
-    }
-  };
-
-  const handleCreate = async (e) => {
-    e.preventDefault();
-    try {
-      await createMovie(newMovie);
-      setNewMovie({ title: "", director: "", release_year: "", poster_url: "", price: "" });
-      fetchMovies();
-    } catch (error) {
-      console.error("Error creating movie:", error);
-    }
-  };
-
-  const handleEdit = async (movieId) => {
-    try {
-      const movieData = await getMovieById(movieId);
-      setEditingMovieId(movieId);
-      setEditingMovieData(movieData);
-    } catch (error) {
-      console.error("Error fetching movie for edit:", error);
-    }
-  };
-
-  const handleUpdate = async (e) => {
-    e.preventDefault();
-    if (!editingMovieId) return;
-
-    try {
-      await updateMovie(editingMovieId, editingMovieData);
-      setEditingMovieId(null);
-      setEditingMovieData(null);
-      fetchMovies();
-    } catch (error) {
-      console.error("Error updating movie:", error);
-    }
-  };
-
+  // Handle movie deletion
   const handleDelete = async (movieId) => {
+    if (!movieId) {
+      console.error("Error: movieId is undefined!");
+      return;
+    }
     try {
       await deleteMovie(movieId);
-      setMovies(movies.filter((movie) => movie.id !== movieId));
+      setMovies((prevMovies) => prevMovies.filter((movie) => movie.id !== movieId));
     } catch (error) {
       console.error("Error deleting movie:", error);
     }
   };
 
+  // Handle adding/updating a movie
+  const handleSaveMovie = async () => {
+    if (!movieForm.title || !movieForm.director) {
+      alert("Title and Director are required!");
+      return;
+    }
+
+    try {
+      if (editingMovieId) {
+        // Update movie if in edit mode
+        const updatedMovie = await updateMovie(editingMovieId, movieForm);
+        setMovies((prevMovies) =>
+          prevMovies.map((movie) => (movie.id === editingMovieId ? updatedMovie : movie))
+        );
+        setEditingMovieId(null); // Exit edit mode
+      } else {
+        // Add a new movie
+        const addedMovie = await createMovie(movieForm);
+        setMovies((prevMovies) => [...prevMovies, addedMovie]);
+      }
+
+      // Reset form fields after adding/updating
+      setMovieForm({ title: "", director: "", release_year: "", price: "", poster_url: "" });
+    } catch (error) {
+      console.error("Error saving movie:", error);
+    }
+  };
+
+  // Handle movie edit click
+  const handleEditMovie = (movie) => {
+    setEditingMovieId(movie.id);
+    setMovieForm({
+      title: movie.title,
+      director: movie.director,
+      release_year: movie.release_year,
+      price: movie.price,
+      poster_url: movie.poster_url,
+    });
+  };
+
+  if (loading) return <p>Loading movies...</p>;
+
   return (
     <div>
-      <h2>Movies List</h2>
-      <ul>
-        {movies.map((movie) => (
-          <li key={movie.id}>
-            {editingMovieId === movie.id && editingMovieData ? (
-              // Show input fields if movie is being edited
-              <div>
-                <input
-                  type="text"
-                  value={editingMovieData.title}
-                  onChange={(e) =>
-                    setEditingMovieData({ ...editingMovieData, title: e.target.value })
-                  }
-                />
-                <input
-                  type="text"
-                  value={editingMovieData.director}
-                  onChange={(e) =>
-                    setEditingMovieData({ ...editingMovieData, director: e.target.value })
-                  }
-                />
-                <input
-                  type="number"
-                  value={editingMovieData.release_year}
-                  onChange={(e) =>
-                    setEditingMovieData({ ...editingMovieData, release_year: e.target.value })
-                  }
-                />
-                <input
-                  type="text"
-                  value={editingMovieData.poster_url}
-                  onChange={(e) =>
-                    setEditingMovieData({ ...editingMovieData, poster_url: e.target.value })
-                  }
-                />
-                <input
-                  type="number"
-                  value={editingMovieData.price}
-                  onChange={(e) =>
-                    setEditingMovieData({ ...editingMovieData, price: e.target.value })
-                  }
-                />
-                <button onClick={handleUpdate}>Update</button>
-                <button onClick={() => setEditingMovieId(null)}>Cancel</button>
-              </div>
-            ) : (
-              // Show normal text if not being edited
-              <div>
-                <h3>{movie.title}</h3>
-                <p>Director: {movie.director}</p>
-                <p>Poster URL: {movie.poster_url}</p>
-                <p>Year: {movie.release_year}</p>
-                <p>Price: ${movie.price}</p>
-                <button onClick={() => handleEdit(movie.id)}>Edit</button>
-                <button onClick={() => handleDelete(movie.id)}>Delete</button>
-              </div>
-            )}
-          </li>
-        ))}
-      </ul>
-
-      {/* Form to create a new movie */}
-      <h2>Add New Movie</h2>
-      <form onSubmit={handleCreate}>
+      <h1>Movie List</h1>
+      {/* Movie Input Form */}
+      <div style={{ marginBottom: "20px" }}>
         <input
           type="text"
           placeholder="Title"
-          value={newMovie.title}
-          onChange={(e) => setNewMovie({ ...newMovie, title: e.target.value })}
-          required
+          value={movieForm.title}
+          onChange={(e) => setMovieForm({ ...movieForm, title: e.target.value })}
         />
         <input
           type="text"
           placeholder="Director"
-          value={newMovie.director}
-          onChange={(e) => setNewMovie({ ...newMovie, director: e.target.value })}
-          required
+          value={movieForm.director}
+          onChange={(e) => setMovieForm({ ...movieForm, director: e.target.value })}
         />
         <input
           type="number"
           placeholder="Release Year"
-          value={newMovie.release_year}
-          onChange={(e) => setNewMovie({ ...newMovie, release_year: e.target.value })}
-          required
-        />
-        <input
-          type="text"
-          placeholder="Poster URL"
-          value={newMovie.poster_url}
-          onChange={(e) => setNewMovie({ ...newMovie, poster_url: e.target.value })}
-          required
+          value={movieForm.release_year}
+          onChange={(e) => setMovieForm({ ...movieForm, release_year: e.target.value })}
         />
         <input
           type="number"
           placeholder="Price"
-          value={newMovie.price}
-          onChange={(e) => setNewMovie({ ...newMovie, price: e.target.value })}
-          required
+          value={movieForm.price}
+          onChange={(e) => setMovieForm({ ...movieForm, price: e.target.value })}
         />
-        <button type="submit">Create</button>
-      </form>
+        <input
+          type="text"
+          placeholder="Poster URL"
+          value={movieForm.poster_url}
+          onChange={(e) => setMovieForm({ ...movieForm, poster_url: e.target.value })}
+        />
+        <button onClick={handleSaveMovie}>
+          {editingMovieId ? "Save Changes" : "Add Movie"}
+        </button>
+      </div>
+
+      {/* Movies List */}
+      <div>
+        {movies.length > 0 ? (
+          movies.map((movie) => (
+            <div
+              key={movie.id || Math.random()} // Ensure unique key
+              style={{
+                border: "1px solid #ccc",
+                padding: "10px",
+                marginBottom: "10px",
+              }}
+            >
+              <h3>{movie.title}</h3>
+              <p>Director: {movie.director}</p>
+              <p>Release Year: {movie.release_year}</p>
+              <img src={movie.poster_url} alt={movie.title} style={{ maxWidth: "100px", maxHeight: "150px" }} />
+              <p>Price: ${movie.price}</p>
+              <button
+                onClick={() => handleDelete(movie.id)}
+                style={{ background: "red", color: "white", marginRight: "10px" }}
+              >
+                Delete
+              </button>
+              <button
+                onClick={() => handleEditMovie(movie)}
+                style={{ background: "blue", color: "white" }}
+              >
+                Update
+              </button>
+            </div>
+          ))
+        ) : (
+          <p>No movies found.</p>
+        )}
+      </div>
     </div>
   );
 };
