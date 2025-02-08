@@ -214,7 +214,7 @@ const MoviesList = () => {
               <h3>{movie.title}</h3>
               <p>Director: {movie.director}</p>
               <p>Release Year: {movie.release_year}</p>
-              <img src={movie.poster_url} alt={movie.title} style={{ maxWidth: "100px", maxHeight: "150px" }} />
+              <img src={"http://localhost:8000/"+movie.poster_url} alt={movie.title} style={{ maxWidth: "100px", maxHeight: "150px" }} />
               <p>Price: ${movie.price}</p>
               <button
                 onClick={() => handleDelete(movie.id)}
